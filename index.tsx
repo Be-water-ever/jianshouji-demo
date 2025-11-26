@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { toPng } from "html-to-image";
+import { toCanvas } from "html-to-image";
 import { 
   Wifi, 
   BatteryFull, 
@@ -430,18 +430,63 @@ const App = () => {
         await document.fonts.ready;
       }
       
-      // 使用 html-to-image 替代 html2canvas，对现代 CSS 支持更好
-      const dataUrl = await toPng(previewRef.current, {
+      // 检测是否为 iOS 设备
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      
+      // 使用 toCanvas 方法，对 iOS Safari 的 box-shadow 兼容性更好
+      const canvas = await toCanvas(previewRef.current, {
         pixelRatio: 3,
         cacheBust: true,
         skipFonts: false,
-        backgroundColor: undefined,
+        backgroundColor: '#EDEDED',
+        // iOS Safari 需要特殊处理
+        style: isIOS ? {
+          // 强制使用硬件加速，改善渲染质量
+          transform: 'translateZ(0)',
+        } : undefined,
+        // 过滤掉可能导致问题的元素
+        filter: (node) => {
+          // 保留所有元素
+          return true;
+        },
       });
       
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `nova-gen-${activeTab}-${Date.now()}.png`;
-      link.click();
+      // 从 canvas 导出为 PNG
+      const dataUrl = canvas.toDataURL('image/png', 1.0);
+      
+      // iOS Safari 需要特殊的下载处理
+      if (isIOS) {
+        // 在 iOS 上，创建一个新窗口显示图片，用户可以长按保存
+        const newWindow = window.open();
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head>
+                <title>长按图片保存</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                  body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f5f5; }
+                  img { max-width: 100%; height: auto; }
+                  p { text-align: center; color: #666; font-family: -apple-system, sans-serif; padding: 20px; }
+                </style>
+              </head>
+              <body>
+                <div>
+                  <p>长按图片保存到相册</p>
+                  <img src="${dataUrl}" />
+                </div>
+              </body>
+            </html>
+          `);
+          newWindow.document.close();
+        }
+      } else {
+        // PC 端正常下载
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = `nova-gen-${activeTab}-${Date.now()}.png`;
+        link.click();
+      }
     } catch (err) {
       console.error("Screenshot failed", err);
       alert("截图生成失败，请重试");
