@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createRoot } from "react-dom/client";
+import { toPng } from "html-to-image";
 import { 
   Wifi, 
   BatteryFull, 
@@ -424,16 +425,21 @@ const App = () => {
   const handleDownload = async () => {
     if (!previewRef.current) return;
     try {
-      // @ts-ignore
-      const canvas = await window.html2canvas(previewRef.current, {
-        scale: 3,
-        useCORS: true, 
-        backgroundColor: null,
-        logging: false,
+      // 等待字体加载完成
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
+      
+      // 使用 html-to-image 替代 html2canvas，对现代 CSS 支持更好
+      const dataUrl = await toPng(previewRef.current, {
+        pixelRatio: 3,
+        cacheBust: true,
+        skipFonts: false,
+        backgroundColor: undefined,
       });
-      const image = canvas.toDataURL("image/png");
+      
       const link = document.createElement("a");
-      link.href = image;
+      link.href = dataUrl;
       link.download = `nova-gen-${activeTab}-${Date.now()}.png`;
       link.click();
     } catch (err) {
