@@ -78,7 +78,9 @@ interface PhoneGlobalConfig {
 interface ChatConfig {
   nickname: string;
   bgImage: string;
-  fontSize: number; 
+  fontSize: number;
+  myAvatar: string;
+  otherAvatar: string;
 }
 
 // RedNote/Post Types
@@ -235,6 +237,8 @@ const App = () => {
     nickname: "文件传输助手",
     bgImage: "",
     fontSize: 16,
+    myAvatar: "",
+    otherAvatar: "",
   });
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', type: 'time', content: '14:20' },
@@ -597,6 +601,170 @@ const App = () => {
                        <input type="text" value={chatConfig.nickname} onChange={(e) => setChatConfig({...chatConfig, nickname: e.target.value})} className={inputFieldClass} />
                     </div>
                   </div>
+                  
+                  {/* 自定义头像上传 */}
+                  {messageMode === 'wechat' && (
+                    <div className="space-y-3 pt-2">
+                      <label className="block text-xs font-medium text-gray-700">自定义头像</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* 我的头像 */}
+                        <div 
+                          className="relative group border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-green-400 transition cursor-pointer"
+                          onClick={() => document.getElementById('myAvatarInput')?.click()}
+                          onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-green-400', 'bg-green-50'); }}
+                          onDragLeave={(e) => { e.currentTarget.classList.remove('border-green-400', 'bg-green-50'); }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('border-green-400', 'bg-green-50');
+                            const file = e.dataTransfer.files[0];
+                            if (file && file.type.startsWith('image/')) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setChatConfig({...chatConfig, myAvatar: reader.result as string});
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        >
+                          <input 
+                            id="myAvatarInput" 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => setChatConfig({...chatConfig, myAvatar: reader.result as string});
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 flex-shrink-0">
+                              {chatConfig.myAvatar ? (
+                                <img src={chatConfig.myAvatar} className="w-full h-full object-cover" alt="我的头像" />
+                              ) : (
+                                <Avatar type="me" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-700">我的头像</p>
+                              <p className="text-[10px] text-gray-400 truncate">点击或拖拽上传</p>
+                            </div>
+                          </div>
+                          {chatConfig.myAvatar && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setChatConfig({...chatConfig, myAvatar: ""}); }}
+                              className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                            >×</button>
+                          )}
+                        </div>
+                        
+                        {/* 对方头像 */}
+                        <div 
+                          className="relative group border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-blue-400 transition cursor-pointer"
+                          onClick={() => document.getElementById('otherAvatarInput')?.click()}
+                          onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400', 'bg-blue-50'); }}
+                          onDragLeave={(e) => { e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50'); }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
+                            const file = e.dataTransfer.files[0];
+                            if (file && file.type.startsWith('image/')) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setChatConfig({...chatConfig, otherAvatar: reader.result as string});
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        >
+                          <input 
+                            id="otherAvatarInput" 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => setChatConfig({...chatConfig, otherAvatar: reader.result as string});
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 flex-shrink-0">
+                              {chatConfig.otherAvatar ? (
+                                <img src={chatConfig.otherAvatar} className="w-full h-full object-cover" alt="对方头像" />
+                              ) : (
+                                <Avatar type="other" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-700">对方头像</p>
+                              <p className="text-[10px] text-gray-400 truncate">点击或拖拽上传</p>
+                            </div>
+                          </div>
+                          {chatConfig.otherAvatar && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setChatConfig({...chatConfig, otherAvatar: ""}); }}
+                              className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                            >×</button>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* 聊天背景 */}
+                      <div 
+                        className="relative group border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-purple-400 transition cursor-pointer"
+                        onClick={() => document.getElementById('bgImageInput')?.click()}
+                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-purple-400', 'bg-purple-50'); }}
+                        onDragLeave={(e) => { e.currentTarget.classList.remove('border-purple-400', 'bg-purple-50'); }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.currentTarget.classList.remove('border-purple-400', 'bg-purple-50');
+                          const file = e.dataTransfer.files[0];
+                          if (file && file.type.startsWith('image/')) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => setChatConfig({...chatConfig, bgImage: reader.result as string});
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      >
+                        <input 
+                          id="bgImageInput" 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setChatConfig({...chatConfig, bgImage: reader.result as string});
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-10 rounded overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                            {chatConfig.bgImage ? (
+                              <img src={chatConfig.bgImage} className="w-full h-full object-cover" alt="聊天背景" />
+                            ) : (
+                              <ImageIcon className="w-5 h-5 text-gray-300" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-700">聊天背景</p>
+                            <p className="text-[10px] text-gray-400">点击或拖拽上传自定义背景图</p>
+                          </div>
+                        </div>
+                        {chatConfig.bgImage && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setChatConfig({...chatConfig, bgImage: ""}); }}
+                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                          >×</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -1045,13 +1213,35 @@ const App = () => {
                     <div className="flex items-center justify-end w-1/4"><MoreHorizontal className="w-6 h-6 text-[#191919]" /></div>
                   </div>
                   {/* Chat Body */}
-                  <div ref={chatContainerRef} className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-4 bg-[#EDEDED]">
+                  <div 
+                    ref={chatContainerRef} 
+                    className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-4 bg-[#EDEDED]"
+                    style={chatConfig.bgImage ? { 
+                      backgroundImage: `url(${chatConfig.bgImage})`, 
+                      backgroundSize: 'cover', 
+                      backgroundPosition: 'center' 
+                    } : undefined}
+                  >
                      {messages.map((msg) => {
                         const isMe = msg.type === 'me' || msg.sender === 'me';
                         const bubbleStyle = { fontSize: `${chatConfig.fontSize}px` };
 
                         if (msg.type === 'time' || msg.type === 'system') return <div key={msg.id} className="flex justify-center my-4"><span className="bg-[#DADADA] text-white text-xs px-2 py-1 rounded-[4px] bg-opacity-60">{msg.content}</span></div>;
                         
+                        // 渲染自定义头像或默认头像
+                        const renderAvatar = (type: 'me' | 'other') => {
+                          const customAvatar = type === 'me' ? chatConfig.myAvatar : chatConfig.otherAvatar;
+                          return (
+                            <div className="w-[40px] h-[40px] rounded-[6px] overflow-hidden">
+                              {customAvatar ? (
+                                <img src={customAvatar} className="w-full h-full object-cover" alt={type === 'me' ? '我的头像' : '对方头像'} />
+                              ) : (
+                                <Avatar type={type} />
+                              )}
+                            </div>
+                          );
+                        };
+
                         // Voice Message
                         if (msg.type === 'voice') {
                             const durationVal = parseInt(msg.meta?.duration || '10');
@@ -1059,7 +1249,7 @@ const App = () => {
                             
                             return (
                                 <div key={msg.id} className={`flex items-start gap-2.5 mb-1 ${isMe ? 'justify-end' : ''}`}>
-                                    {!isMe && <div className="w-[40px] h-[40px] rounded-[6px] overflow-hidden"><Avatar type="other" /></div>}
+                                    {!isMe && renderAvatar('other')}
                                     
                                     <div className="flex flex-col gap-1 max-w-[70%]">
                                         <div 
@@ -1079,7 +1269,7 @@ const App = () => {
                                         )}
                                     </div>
                                     
-                                    {isMe && <div className="w-[40px] h-[40px] rounded-[6px] overflow-hidden"><Avatar type="me" /></div>}
+                                    {isMe && renderAvatar('me')}
                                 </div>
                             )
                         }
@@ -1088,7 +1278,7 @@ const App = () => {
                         if (msg.type === 'call') {
                             return (
                                 <div key={msg.id} className={`flex items-start gap-2.5 mb-1 ${isMe ? 'justify-end' : ''}`}>
-                                    {!isMe && <div className="w-[40px] h-[40px] rounded-[6px] overflow-hidden"><Avatar type="other" /></div>}
+                                    {!isMe && renderAvatar('other')}
                                     <div className={`max-w-[70%] rounded-[6px] shadow-sm relative ${isMe ? 'bg-[#95EC69]' : 'bg-white'}`}>
                                         {isMe && <div className="absolute top-[14px] -right-[6px] w-0 h-0 border-t-[6px] border-t-transparent border-l-[8px] border-l-[#95EC69] border-b-[6px] border-b-transparent"></div>}
                                         {!isMe && <div className="absolute top-[14px] -left-[6px] w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-white border-b-[6px] border-b-transparent"></div>}
@@ -1111,7 +1301,7 @@ const App = () => {
                                               </div>
                                           </div>
                                     </div>
-                                    {isMe && <div className="w-[40px] h-[40px] rounded-[6px] overflow-hidden"><Avatar type="me" /></div>}
+                                    {isMe && renderAvatar('me')}
                                 </div>
                             )
                         }
@@ -1119,7 +1309,7 @@ const App = () => {
                         // Text/Image Message
                         return (
                            <div key={msg.id} className={`flex items-start gap-2.5 mb-1 ${isMe ? 'justify-end' : ''}`}>
-                              {!isMe && <div className="w-[40px] h-[40px] rounded-[6px] overflow-hidden"><Avatar type="other" /></div>}
+                              {!isMe && renderAvatar('other')}
                               <div className={`max-w-[70%] p-2.5 px-3 rounded-[6px] text-black leading-relaxed break-words shadow-sm relative 
                                  ${isMe ? 'bg-[#95EC69]' : 'bg-white'}`} style={bubbleStyle}>
                                  {isMe && <div className="absolute top-[14px] -right-[6px] w-0 h-0 border-t-[6px] border-t-transparent border-l-[8px] border-l-[#95EC69] border-b-[6px] border-b-transparent"></div>}
@@ -1131,7 +1321,7 @@ const App = () => {
                                      </div>
                                  ) : msg.content}
                               </div>
-                              {isMe && <div className="w-[40px] h-[40px] rounded-[6px] overflow-hidden"><Avatar type="me" /></div>}
+                              {isMe && renderAvatar('me')}
                            </div>
                         )
                      })}
