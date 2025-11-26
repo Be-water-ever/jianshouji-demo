@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { toCanvas } from "html-to-image";
+import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 import { 
   Wifi, 
   BatteryFull, 
@@ -253,6 +255,15 @@ const App = () => {
   const [chatInput, setChatInput] = useState("");
   const [photoImageUrl, setPhotoImageUrl] = useState(""); // 图片工具专用的图片URL/Base64
   
+  // Avatar Crop State
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState("");
+  const [cropTarget, setCropTarget] = useState<"myAvatar" | "otherAvatar" | null>(null);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const imgRef = useRef<HTMLImageElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  
   // 切换工具时的处理函数
   const handleToolChange = (toolId: "text" | "photo" | "call" | "voice" | "system" | "date" | "font") => {
     setActiveTool(toolId);
@@ -334,6 +345,47 @@ const App = () => {
     }
   }, [messages, activeTab, messageMode]);
 
+  // 更新预览 canvas
+  useEffect(() => {
+    if (!completedCrop || !imgRef.current || !previewCanvasRef.current) {
+      return;
+    }
+
+    const image = imgRef.current;
+    const canvas = previewCanvasRef.current;
+    const crop = completedCrop;
+
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    const pixelRatio = window.devicePixelRatio;
+
+    canvas.width = 96 * pixelRatio;
+    canvas.height = 96 * pixelRatio;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    ctx.imageSmoothingQuality = 'high';
+
+    const cropX = crop.x * scaleX;
+    const cropY = crop.y * scaleY;
+    const cropWidth = crop.width * scaleX;
+    const cropHeight = crop.height * scaleY;
+
+    ctx.drawImage(
+      image,
+      cropX,
+      cropY,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      96,
+      96
+    );
+  }, [completedCrop]);
+
   const getScreenBgClass = () => {
     switch (activeTab) {
       case "message": return messageMode === 'wechat' ? "bg-[#EDEDED]" : "bg-white";
@@ -351,6 +403,89 @@ const App = () => {
   };
 
   // --- Handlers ---
+
+  // 打开头像裁剪弹窗
+  const openCropModal = (imageSrc: string, target: "myAvatar" | "otherAvatar") => {
+    setCropImageSrc(imageSrc);
+    setCropTarget(target);
+    setCropModalOpen(true);
+    setCrop(undefined);
+  };
+
+  // 关闭裁剪弹窗
+  const closeCropModal = () => {
+    setCropModalOpen(false);
+    setCropImageSrc("");
+    setCropTarget(null);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+  };
+
+  // 图片加载完成时设置默认裁剪区域
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget;
+    const crop = centerCrop(
+      makeAspectCrop(
+        {
+          unit: '%',
+          width: 90,
+        },
+        1, // 1:1 比例
+        width,
+        height
+      ),
+      width,
+      height
+    );
+    setCrop(crop);
+  };
+
+  // 执行裁剪并保存
+  const handleCropConfirm = useCallback(async () => {
+    if (!imgRef.current || !completedCrop || !cropTarget) return;
+
+    const image = imgRef.current;
+    const canvas = document.createElement('canvas');
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    const pixelRatio = window.devicePixelRatio;
+
+    canvas.width = completedCrop.width * scaleX * pixelRatio;
+    canvas.height = completedCrop.height * scaleY * pixelRatio;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    ctx.imageSmoothingQuality = 'high';
+
+    const cropX = completedCrop.x * scaleX;
+    const cropY = completedCrop.y * scaleY;
+
+    ctx.drawImage(
+      image,
+      cropX,
+      cropY,
+      completedCrop.width * scaleX,
+      completedCrop.height * scaleY,
+      0,
+      0,
+      completedCrop.width * scaleX,
+      completedCrop.height * scaleY
+    );
+
+    const croppedImageUrl = canvas.toDataURL('image/png');
+    
+    setChatConfig(prev => {
+      if (cropTarget === 'myAvatar') {
+        return {...prev, myAvatar: croppedImageUrl};
+      } else {
+        return {...prev, otherAvatar: croppedImageUrl};
+      }
+    });
+    
+    closeCropModal();
+  }, [completedCrop, cropTarget]);
 
   const addChatMessage = () => {
     const id = Date.now().toString();
@@ -635,7 +770,7 @@ const App = () => {
                             const file = e.dataTransfer.files[0];
                             if (file && file.type.startsWith('image/')) {
                               const reader = new FileReader();
-                              reader.onloadend = () => setChatConfig({...chatConfig, myAvatar: reader.result as string});
+                              reader.onloadend = () => openCropModal(reader.result as string, 'myAvatar');
                               reader.readAsDataURL(file);
                             }
                           }}
@@ -649,7 +784,7 @@ const App = () => {
                               const file = e.target.files?.[0];
                               if (file) {
                                 const reader = new FileReader();
-                                reader.onloadend = () => setChatConfig({...chatConfig, myAvatar: reader.result as string});
+                                reader.onloadend = () => openCropModal(reader.result as string, 'myAvatar');
                                 reader.readAsDataURL(file);
                               }
                             }}
@@ -687,7 +822,7 @@ const App = () => {
                             const file = e.dataTransfer.files[0];
                             if (file && file.type.startsWith('image/')) {
                               const reader = new FileReader();
-                              reader.onloadend = () => setChatConfig({...chatConfig, otherAvatar: reader.result as string});
+                              reader.onloadend = () => openCropModal(reader.result as string, 'otherAvatar');
                               reader.readAsDataURL(file);
                             }
                           }}
@@ -701,7 +836,7 @@ const App = () => {
                               const file = e.target.files?.[0];
                               if (file) {
                                 const reader = new FileReader();
-                                reader.onloadend = () => setChatConfig({...chatConfig, otherAvatar: reader.result as string});
+                                reader.onloadend = () => openCropModal(reader.result as string, 'otherAvatar');
                                 reader.readAsDataURL(file);
                               }
                             }}
@@ -1804,6 +1939,75 @@ const App = () => {
           </div>
         </div>
       </div>
+      
+      {/* 头像裁剪弹窗 */}
+      {cropModalOpen && cropImageSrc && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">选择头像展示区域</h3>
+              
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* 裁剪区域 */}
+                <div className="flex-1">
+                  {crop && (
+                    <ReactCrop
+                      crop={crop}
+                      onChange={(_, percentCrop) => setCrop(percentCrop)}
+                      onComplete={(c) => setCompletedCrop(c)}
+                      aspect={1}
+                      minWidth={50}
+                      minHeight={50}
+                    >
+                      <img
+                        ref={imgRef}
+                        alt="Crop me"
+                        src={cropImageSrc}
+                        style={{ maxWidth: '100%', maxHeight: '400px' }}
+                        onLoad={onImageLoad}
+                      />
+                    </ReactCrop>
+                  )}
+                </div>
+                
+                {/* 预览区域 */}
+                {completedCrop && imgRef.current && (
+                  <div className="md:w-32 flex flex-col items-center gap-2">
+                    <p className="text-xs text-gray-500 font-medium">预览</p>
+                    <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200">
+                      <canvas
+                        ref={previewCanvasRef}
+                        style={{
+                          objectFit: 'contain',
+                          width: '100%',
+                          height: '100%',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* 操作按钮 */}
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+                <button
+                  onClick={closeCropModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleCropConfirm}
+                  disabled={!completedCrop}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  确认
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
