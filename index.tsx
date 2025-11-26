@@ -251,6 +251,16 @@ const App = () => {
   // Input State
   const [activeTool, setActiveTool] = useState<"text" | "photo" | "call" | "voice" | "system" | "date" | "font">("text");
   const [chatInput, setChatInput] = useState("");
+  const [photoImageUrl, setPhotoImageUrl] = useState(""); // 图片工具专用的图片URL/Base64
+  
+  // 切换工具时的处理函数
+  const handleToolChange = (toolId: "text" | "photo" | "call" | "voice" | "system" | "date" | "font") => {
+    setActiveTool(toolId);
+    // 切换到非图片工具时，清空输入（图片工具使用独立的 photoImageUrl）
+    if (toolId !== 'photo') {
+      setChatInput("");
+    }
+  };
   const [chatSender, setChatSender] = useState<"me" | "other">("other");
   const [imageWidth, setImageWidth] = useState(100);
   const [voiceDuration, setVoiceDuration] = useState(10);
@@ -350,8 +360,8 @@ const App = () => {
        if (!chatInput.trim()) return;
        newMsg = { id, type: chatSender, content: chatInput };
     } else if (activeTool === 'photo') {
-       if (!chatInput.trim()) return;
-       newMsg = { id, type: 'image', sender: chatSender, content: chatInput, meta: { width: imageWidth } };
+       if (!photoImageUrl.trim()) return;
+       newMsg = { id, type: 'image', sender: chatSender, content: photoImageUrl, meta: { width: imageWidth } };
     } else if (activeTool === 'voice') {
        newMsg = { id, type: 'voice', sender: chatSender, content: '', meta: { duration: `${voiceDuration}"`, transcription: voiceTranscription } };
     } else if (activeTool === 'call') {
@@ -365,7 +375,11 @@ const App = () => {
 
     if (newMsg) {
        setMessages([...messages, newMsg]);
-       if (activeTool === 'text' || activeTool === 'system') setChatInput("");
+       if (activeTool === 'text' || activeTool === 'system') {
+         setChatInput("");
+       } else if (activeTool === 'photo') {
+         setPhotoImageUrl("");
+       }
     }
   };
 
@@ -787,7 +801,7 @@ const App = () => {
                      ].map((tool) => (
                        <button 
                           key={tool.id}
-                          onClick={() => setActiveTool(tool.id as any)}
+                          onClick={() => handleToolChange(tool.id as any)}
                           className={`flex flex-col items-center justify-center p-2 rounded-xl transition ${activeTool === tool.id ? 'bg-indigo-100 text-indigo-600 ring-2 ring-indigo-500' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
                        >
                          <tool.icon className="w-6 h-6 mb-1" />
@@ -843,7 +857,7 @@ const App = () => {
                                const file = e.dataTransfer.files[0];
                                if (file && file.type.startsWith('image/')) {
                                  const reader = new FileReader();
-                                 reader.onloadend = () => setChatInput(reader.result as string);
+                                 reader.onloadend = () => setPhotoImageUrl(reader.result as string);
                                  reader.readAsDataURL(file);
                                }
                              }}
@@ -857,16 +871,19 @@ const App = () => {
                                  const file = e.target.files?.[0];
                                  if (file) {
                                    const reader = new FileReader();
-                                   reader.onloadend = () => setChatInput(reader.result as string);
+                                   reader.onloadend = () => setPhotoImageUrl(reader.result as string);
                                    reader.readAsDataURL(file);
                                  }
                                }}
                              />
-                             {chatInput && chatInput.startsWith('data:image') ? (
+                             {photoImageUrl && photoImageUrl.startsWith('data:image') ? (
                                <div className="relative">
-                                 <img src={chatInput} className="max-h-32 mx-auto rounded" alt="预览" />
+                                 <img src={photoImageUrl} className="max-h-32 mx-auto rounded" alt="预览" />
                                  <button 
-                                   onClick={(e) => { e.stopPropagation(); setChatInput(""); }}
+                                   onClick={(e) => { 
+                                     e.stopPropagation(); 
+                                     setPhotoImageUrl("");
+                                   }}
                                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
                                  >×</button>
                                </div>
@@ -883,8 +900,8 @@ const App = () => {
                              <span className="text-[10px] text-gray-400">或输入URL:</span>
                              <input 
                                type="text" 
-                               value={chatInput.startsWith('data:image') ? '' : chatInput} 
-                               onChange={(e) => setChatInput(e.target.value)} 
+                               value={photoImageUrl.startsWith('data:image') ? '' : photoImageUrl} 
+                               onChange={(e) => setPhotoImageUrl(e.target.value)} 
                                placeholder="https://..." 
                                className={`${inputFieldClass} text-xs flex-1`} 
                              />
@@ -1474,16 +1491,20 @@ const App = () => {
                         }
 
                         // Text/Image Message
+                        const imageWidthPercent = msg.type === 'image' ? (msg.meta?.width || 100) : 100;
                         return (
                            <div key={msg.id} className={`flex items-start gap-2.5 mb-1 ${isMe ? 'justify-end' : ''}`}>
                               {!isMe && renderAvatar('other')}
-                              <div className={`max-w-[70%] p-2.5 px-3 rounded-[6px] text-black leading-relaxed break-words shadow-sm relative 
-                                 ${isMe ? 'bg-[#95EC69]' : 'bg-white'}`} style={bubbleStyle}>
+                              <div className={`${msg.type === 'image' ? 'w-fit' : 'max-w-[70%]'} p-2.5 px-3 rounded-[6px] text-black leading-relaxed break-words shadow-sm relative 
+                                 ${isMe ? 'bg-[#95EC69]' : 'bg-white'}`} style={{
+                                 ...bubbleStyle,
+                                 ...(msg.type === 'image' ? { maxWidth: `calc(70% * ${imageWidthPercent / 100})` } : {})
+                               }}>
                                  {isMe && <div className="absolute top-[14px] -right-[6px] w-0 h-0 border-t-[6px] border-t-transparent border-l-[8px] border-l-[#95EC69] border-b-[6px] border-b-transparent"></div>}
                                  {!isMe && <div className="absolute top-[14px] -left-[6px] w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-white border-b-[6px] border-b-transparent"></div>}
                                  
                                  {msg.type === 'image' ? (
-                                     <div style={{ width: `${(msg.meta?.width || 100)}%`, maxWidth: '100%' }}>
+                                     <div style={{ width: '100%', maxWidth: '100%' }}>
                                         <img src={msg.content} className="w-full h-auto block rounded-[4px]" alt="chat" crossOrigin="anonymous" />
                                      </div>
                                  ) : msg.content}
