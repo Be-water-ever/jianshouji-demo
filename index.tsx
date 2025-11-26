@@ -1950,7 +1950,7 @@ const App = () => {
               <div className="flex flex-col md:flex-row gap-4">
                 {/* 裁剪区域 */}
                 <div className="flex-1">
-                  {crop && (
+                  {cropImageSrc && (
                     <ReactCrop
                       crop={crop}
                       onChange={(_, percentCrop) => setCrop(percentCrop)}
@@ -1963,7 +1963,7 @@ const App = () => {
                         ref={imgRef}
                         alt="Crop me"
                         src={cropImageSrc}
-                        style={{ maxWidth: '100%', maxHeight: '400px' }}
+                        style={{ maxWidth: '100%', maxHeight: '400px', display: 'block' }}
                         onLoad={onImageLoad}
                       />
                     </ReactCrop>
