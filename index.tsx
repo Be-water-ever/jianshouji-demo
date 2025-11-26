@@ -78,7 +78,7 @@ interface PhoneGlobalConfig {
 interface ChatConfig {
   nickname: string;
   bgImage: string;
-  fontSize: number;
+  fontSize: number; 
   myAvatar: string;
   otherAvatar: string;
 }
@@ -132,6 +132,7 @@ interface ForumConfig {
   title: string;
   opNickname: string;
   opContent: string;
+  opImage: string; // 楼主正文图片
   viewCount: string;
   replyCount: string;
 }
@@ -296,6 +297,7 @@ const App = () => {
     title: "【求助】捡到一个没锁的手机，看到备忘录我惊了",
     opNickname: "无名氏",
     opContent: "如题，楼主现在手在发抖，不知道该不该报警。备忘录里写着...",
+    opImage: "",
     viewCount: "5821",
     replyCount: "32"
   });
@@ -509,10 +511,10 @@ const App = () => {
         }
       } else {
         // PC 端正常下载
-        const link = document.createElement("a");
+      const link = document.createElement("a");
         link.href = dataUrl;
-        link.download = `nova-gen-${activeTab}-${Date.now()}.png`;
-        link.click();
+      link.download = `nova-gen-${activeTab}-${Date.now()}.png`;
+      link.click();
       }
     } catch (err) {
       console.error("Screenshot failed", err);
@@ -829,7 +831,65 @@ const App = () => {
 
                     {activeTool === 'photo' && (
                         <div className="space-y-3">
-                           <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="图片URL..." className={inputFieldClass} />
+                           {/* 图片上传区域 */}
+                           <div 
+                             className="relative border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-indigo-400 transition cursor-pointer text-center"
+                             onClick={() => document.getElementById('chatPhotoInput')?.click()}
+                             onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-indigo-400', 'bg-indigo-50'); }}
+                             onDragLeave={(e) => { e.currentTarget.classList.remove('border-indigo-400', 'bg-indigo-50'); }}
+                             onDrop={(e) => {
+                               e.preventDefault();
+                               e.currentTarget.classList.remove('border-indigo-400', 'bg-indigo-50');
+                               const file = e.dataTransfer.files[0];
+                               if (file && file.type.startsWith('image/')) {
+                                 const reader = new FileReader();
+                                 reader.onloadend = () => setChatInput(reader.result as string);
+                                 reader.readAsDataURL(file);
+                               }
+                             }}
+                           >
+                             <input 
+                               id="chatPhotoInput" 
+                               type="file" 
+                               accept="image/*" 
+                               className="hidden" 
+                               onChange={(e) => {
+                                 const file = e.target.files?.[0];
+                                 if (file) {
+                                   const reader = new FileReader();
+                                   reader.onloadend = () => setChatInput(reader.result as string);
+                                   reader.readAsDataURL(file);
+                                 }
+                               }}
+                             />
+                             {chatInput && chatInput.startsWith('data:image') ? (
+                               <div className="relative">
+                                 <img src={chatInput} className="max-h-32 mx-auto rounded" alt="预览" />
+                                 <button 
+                                   onClick={(e) => { e.stopPropagation(); setChatInput(""); }}
+                                   className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                                 >×</button>
+                               </div>
+                             ) : (
+                               <div className="py-4">
+                                 <ImageIcon className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                                 <p className="text-xs text-gray-500">点击或拖拽上传图片</p>
+                               </div>
+                             )}
+                           </div>
+                           
+                           {/* URL 输入备选 */}
+                           <div className="flex items-center gap-2">
+                             <span className="text-[10px] text-gray-400">或输入URL:</span>
+                             <input 
+                               type="text" 
+                               value={chatInput.startsWith('data:image') ? '' : chatInput} 
+                               onChange={(e) => setChatInput(e.target.value)} 
+                               placeholder="https://..." 
+                               className={`${inputFieldClass} text-xs flex-1`} 
+                             />
+                           </div>
+                           
                            <div>
                              <div className="flex justify-between text-xs text-gray-500 mb-1">
                                <span>图片显示宽度</span>
@@ -950,6 +1010,57 @@ const App = () => {
                         <label className="block text-xs font-medium text-gray-700 mb-1">楼主正文</label>
                         <textarea value={forumConfig.opContent} onChange={e => setForumConfig({...forumConfig, opContent: e.target.value})} className={`${inputAreaClass} h-24`} />
                       </div>
+                      
+                      {/* 楼主正文图片（可选） */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">正文图片（可选）</label>
+                        <div 
+                          className="relative border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-blue-400 transition cursor-pointer"
+                          onClick={() => document.getElementById('forumOpImageInput')?.click()}
+                          onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400', 'bg-blue-50'); }}
+                          onDragLeave={(e) => { e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50'); }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
+                            const file = e.dataTransfer.files[0];
+                            if (file && file.type.startsWith('image/')) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setForumConfig({...forumConfig, opImage: reader.result as string});
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        >
+                          <input 
+                            id="forumOpImageInput" 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => setForumConfig({...forumConfig, opImage: reader.result as string});
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          {forumConfig.opImage ? (
+                            <div className="relative">
+                              <img src={forumConfig.opImage} className="max-h-20 mx-auto rounded" alt="预览" />
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); setForumConfig({...forumConfig, opImage: ""}); }}
+                                className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                              >×</button>
+                            </div>
+                          ) : (
+                            <div className="py-2 text-center">
+                              <ImageIcon className="w-5 h-5 mx-auto text-gray-300 mb-1" />
+                              <p className="text-[10px] text-gray-400">点击或拖拽上传图片</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
                       <div className="grid grid-cols-3 gap-2">
                          <div className="col-span-1">
                             <label className="block text-xs font-medium text-gray-700 mb-1">楼主昵称</label>
@@ -1095,8 +1206,64 @@ const App = () => {
                         <input type="text" value={postConfig.tags} onChange={e => setPostConfig({...postConfig, tags: e.target.value})} className={`${inputFieldClass} text-blue-500`} />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">图片URL (空则显示占位)</label>
-                        <input type="text" value={postConfig.imageUrl} onChange={e => setPostConfig({...postConfig, imageUrl: e.target.value})} placeholder="https://..." className={`${inputFieldClass} text-xs`} />
+                        <label className="block text-xs font-medium text-gray-700 mb-1">帖子图片</label>
+                        {/* 图片上传区域 */}
+                        <div 
+                          className="relative border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-red-400 transition cursor-pointer"
+                          onClick={() => document.getElementById('postImageInput')?.click()}
+                          onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-red-400', 'bg-red-50'); }}
+                          onDragLeave={(e) => { e.currentTarget.classList.remove('border-red-400', 'bg-red-50'); }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('border-red-400', 'bg-red-50');
+                            const file = e.dataTransfer.files[0];
+                            if (file && file.type.startsWith('image/')) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setPostConfig({...postConfig, imageUrl: reader.result as string});
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        >
+                          <input 
+                            id="postImageInput" 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => setPostConfig({...postConfig, imageUrl: reader.result as string});
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          {postConfig.imageUrl ? (
+                            <div className="relative">
+                              <img src={postConfig.imageUrl} className="max-h-24 mx-auto rounded" alt="预览" />
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); setPostConfig({...postConfig, imageUrl: ""}); }}
+                                className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                              >×</button>
+                            </div>
+                          ) : (
+                            <div className="py-2 text-center">
+                              <ImageIcon className="w-6 h-6 mx-auto text-gray-300 mb-1" />
+                              <p className="text-[10px] text-gray-400">点击或拖拽上传图片</p>
+                            </div>
+                          )}
+                        </div>
+                        {/* URL 输入备选 */}
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-[10px] text-gray-400 flex-shrink-0">或URL:</span>
+                          <input 
+                            type="text" 
+                            value={postConfig.imageUrl.startsWith('data:image') ? '' : postConfig.imageUrl} 
+                            onChange={e => setPostConfig({...postConfig, imageUrl: e.target.value})} 
+                            placeholder="https://..." 
+                            className={`${inputFieldClass} text-xs flex-1`} 
+                          />
+                        </div>
                     </div>
                  </div>
 
@@ -1241,7 +1408,7 @@ const App = () => {
                             </div>
                           );
                         };
-
+                        
                         // Voice Message
                         if (msg.type === 'voice') {
                             const durationVal = parseInt(msg.meta?.duration || '10');
@@ -1420,6 +1587,11 @@ const App = () => {
                             </div>
                          </div>
                          <div className="text-[16px] text-[#333] leading-7 min-h-[80px] whitespace-pre-wrap">{forumConfig.opContent}</div>
+                         {forumConfig.opImage && (
+                           <div className="mt-3">
+                             <img src={forumConfig.opImage} className="max-w-full rounded-lg" alt="帖子图片" />
+                           </div>
+                         )}
                          <div className="flex justify-end gap-6 mt-4 opacity-60">
                             <div className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer" onClick={() => handleForumReplyClick({id: 'op', nickname: forumConfig.opNickname, content: forumConfig.opContent})}><MessageSquare className="w-4 h-4" /> 回复</div>
                             <div className="flex items-center gap-1 text-xs text-gray-500"><ThumbsUp className="w-4 h-4" /> 赞</div>
