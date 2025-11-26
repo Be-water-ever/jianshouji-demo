@@ -433,6 +433,21 @@ const App = () => {
       // 检测是否为 iOS 设备
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       
+      // iOS Safari 需要特殊处理：临时替换阴影样式
+      if (isIOS) {
+        const shadowElements = previewRef.current.querySelectorAll('.shadow-sm');
+        shadowElements.forEach((el) => {
+           const htmlEl = el as HTMLElement;
+           // 保存原始样式
+           htmlEl.dataset.originalBoxShadow = htmlEl.style.boxShadow;
+           htmlEl.dataset.originalFilter = htmlEl.style.filter;
+           
+           // 应用 SVG filter
+           htmlEl.style.boxShadow = 'none';
+           htmlEl.style.filter = 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))';
+        });
+      }
+
       // 使用 toCanvas 方法，对 iOS Safari 的 box-shadow 兼容性更好
       const canvas = await toCanvas(previewRef.current, {
         pixelRatio: 3,
@@ -444,12 +459,20 @@ const App = () => {
           // 强制使用硬件加速，改善渲染质量
           transform: 'translateZ(0)',
         } : undefined,
-        // 过滤掉可能导致问题的元素
-        filter: (node) => {
-          // 保留所有元素
-          return true;
-        },
       });
+      
+      // 恢复原始样式
+      if (isIOS) {
+        const shadowElements = previewRef.current.querySelectorAll('.shadow-sm');
+        shadowElements.forEach((el) => {
+           const htmlEl = el as HTMLElement;
+           htmlEl.style.boxShadow = htmlEl.dataset.originalBoxShadow || '';
+           htmlEl.style.filter = htmlEl.dataset.originalFilter || '';
+           // 清理 dataset
+           delete htmlEl.dataset.originalBoxShadow;
+           delete htmlEl.dataset.originalFilter;
+        });
+      }
       
       // 从 canvas 导出为 PNG
       const dataUrl = canvas.toDataURL('image/png', 1.0);
