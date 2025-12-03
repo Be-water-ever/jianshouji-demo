@@ -282,6 +282,8 @@ const App = () => {
   const [inspirationOpen, setInspirationOpen] = useState(false);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const forumContainerRef = useRef<HTMLDivElement>(null);
+  const postContainerRef = useRef<HTMLDivElement>(null);
 
   // Post (RedNote) State
   const [postConfig, setPostConfig] = useState<PostConfig>({
@@ -579,6 +581,38 @@ const App = () => {
 
   const handleDownload = async () => {
     if (!previewRef.current) return;
+    
+    // 获取当前活动的滚动容器
+    const getActiveScrollContainer = () => {
+      if (activeTab === 'message') return chatContainerRef.current;
+      if (activeTab === 'forum') return forumContainerRef.current;
+      if (activeTab === 'post') return postContainerRef.current;
+      return null;
+    };
+
+    // 处理滚动位置：临时调整容器位置以匹配当前可见区域
+    const scrollContainer = getActiveScrollContainer();
+    let originalTransform = '';
+    let originalScrollTop = 0;
+    let originalOverflow = '';
+
+    if (scrollContainer) {
+      originalScrollTop = scrollContainer.scrollTop;
+      
+      if (originalScrollTop > 0) {
+        // 保存原始样式
+        originalTransform = scrollContainer.style.transform;
+        originalOverflow = scrollContainer.style.overflow;
+        
+        // 将滚动位置转换为视觉偏移
+        // 1. 重置滚动位置，让库从顶部开始捕获
+        // 2. 使用 transform 向上移动内容，使当前可见区域出现在顶部
+        scrollContainer.scrollTop = 0; // 重置滚动用于捕获
+        scrollContainer.style.transform = `translateY(-${originalScrollTop}px)`;
+        scrollContainer.style.overflow = 'visible'; // 确保内容完全渲染，父容器的 overflow:hidden 会处理裁剪
+      }
+    }
+    
     try {
       // 等待字体加载完成
       if (document.fonts && document.fonts.ready) {
@@ -616,7 +650,7 @@ const App = () => {
         } : undefined,
       });
       
-      // 恢复原始样式
+      // 恢复原始样式（iOS 阴影处理）
       if (isIOS) {
         const shadowElements = previewRef.current.querySelectorAll('.shadow-sm');
         shadowElements.forEach((el) => {
@@ -668,6 +702,13 @@ const App = () => {
     } catch (err) {
       console.error("Screenshot failed", err);
       alert("截图生成失败，请重试");
+    } finally {
+      // 确保无论成功还是失败都恢复滚动位置和样式
+      if (scrollContainer && originalScrollTop > 0) {
+        scrollContainer.style.transform = originalTransform;
+        scrollContainer.style.overflow = originalOverflow;
+        scrollContainer.scrollTop = originalScrollTop; // 恢复滚动位置
+      }
     }
   };
 
@@ -1725,7 +1766,7 @@ const App = () => {
                    </div>
 
                    {/* Forum Content */}
-                   <div className="flex-1 overflow-y-auto no-scrollbar">
+                   <div ref={forumContainerRef} className="flex-1 overflow-y-auto no-scrollbar">
                       {/* OP Floor (Floor 1) */}
                       <div className="bg-white p-4 mb-2">
                          <h1 className="text-[19px] font-bold text-[#333] leading-tight mb-3">{forumConfig.title}</h1>
@@ -1825,7 +1866,7 @@ const App = () => {
                    </div>
 
                    {/* Content */}
-                   <div className="flex-1 overflow-y-auto no-scrollbar pb-12">
+                   <div ref={postContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-12">
                       {/* Image Carousel Mock */}
                       <div className="w-full aspect-[3/4] bg-gray-100 relative mb-3 overflow-hidden">
                           {postConfig.imageUrl ? (
