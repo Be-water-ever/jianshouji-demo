@@ -264,6 +264,11 @@ const App = () => {
   const imgRef = useRef<HTMLImageElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   
+  // Input refs for maintaining focus
+  const chatInputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
+  const commentInputRef = useRef<HTMLInputElement>(null);
+  const forumInputRef = useRef<HTMLTextAreaElement>(null);
+  
   // 切换工具时的处理函数
   const handleToolChange = (toolId: "text" | "photo" | "call" | "voice" | "system" | "date" | "font") => {
     setActiveTool(toolId);
@@ -512,8 +517,12 @@ const App = () => {
 
     if (newMsg) {
        setMessages([...messages, newMsg]);
-       if (activeTool === 'text' || activeTool === 'system') {
+       if (activeTool === 'text' || activeTool === 'system' || activeTool === 'date') {
          setChatInput("");
+         // 重新聚焦输入框，方便连续输入
+         setTimeout(() => {
+           chatInputRef.current?.focus();
+         }, 0);
        } else if (activeTool === 'photo') {
          setPhotoImageUrl("");
        }
@@ -545,6 +554,10 @@ const App = () => {
       setComments([...comments, { ...commentData, replies: [] }]);
     }
     setNewComment({ ...newComment, content: "", likes: 0 });
+    // 重新聚焦输入框，方便连续输入
+    setTimeout(() => {
+      commentInputRef.current?.focus();
+    }, 0);
   };
 
   const addForumReply = () => {
@@ -563,6 +576,10 @@ const App = () => {
     };
     setForumReplies([...forumReplies, newReply]);
     setNewForumReply({ ...newForumReply, content: "", quote: "", quoteTargetNickname: "" });
+    // 重新聚焦输入框，方便连续输入
+    setTimeout(() => {
+      forumInputRef.current?.focus();
+    }, 0);
   };
 
   const handleForumReplyClick = (target: { id: string, nickname: string, content: string } | null) => {
@@ -1082,7 +1099,7 @@ const App = () => {
                                 ))}
                              </div>
                           )}
-                          <textarea value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="输入内容..." className={inputAreaClass} />
+                          <textarea ref={chatInputRef as React.Ref<HTMLTextAreaElement>} value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="输入内容..." className={inputAreaClass} />
                         </div>
                     )}
 
@@ -1165,9 +1182,9 @@ const App = () => {
                         </div>
                     )}
 
-                    {activeTool === 'system' && <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="系统消息内容..." className={inputFieldClass} />}
+                    {activeTool === 'system' && <input ref={chatInputRef as React.Ref<HTMLInputElement>} type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="系统消息内容..." className={inputFieldClass} />}
                     
-                    {activeTool === 'date' && <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="例如: 昨天 14:00 (留空使用当前)" className={inputFieldClass} />}
+                    {activeTool === 'date' && <input ref={chatInputRef as React.Ref<HTMLInputElement>} type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="例如: 昨天 14:00 (留空使用当前)" className={inputFieldClass} />}
                     
                     {activeTool === 'voice' && (
                         <div className="space-y-3">
@@ -1394,7 +1411,7 @@ const App = () => {
 
                          <div className="mb-2">
                             <label className="block text-xs font-medium text-gray-500 mb-1">回复内容</label>
-                            <textarea value={newForumReply.content} onChange={e => setNewForumReply({...newForumReply, content: e.target.value})} className={inputAreaClass} />
+                            <textarea ref={forumInputRef} value={newForumReply.content} onChange={e => setNewForumReply({...newForumReply, content: e.target.value})} className={inputAreaClass} />
                          </div>
                          <button onClick={addForumReply} className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-bold">添加回复</button>
                       </div>
@@ -1538,7 +1555,7 @@ const App = () => {
                         )}
                         <input type="text" value={newComment.nickname} onChange={e => setNewComment({...newComment, nickname: e.target.value})} placeholder="评论人昵称" className={`${inputFieldClass} mb-2`} />
                         <div className="flex gap-2 mb-2">
-                             <input type="text" value={newComment.content} onChange={e => setNewComment({...newComment, content: e.target.value})} placeholder="评论内容..." className={`${inputFieldClass} flex-1`} />
+                             <input ref={commentInputRef} type="text" value={newComment.content} onChange={e => setNewComment({...newComment, content: e.target.value})} placeholder="评论内容..." className={`${inputFieldClass} flex-1`} />
                              <div className="relative w-20">
                                 <Heart className="w-3 h-3 absolute top-3 left-2 text-gray-400" />
                                 <input type="number" value={newComment.likes} onChange={e => setNewComment({...newComment, likes: Number(e.target.value)})} placeholder="赞" className={`${inputFieldClass} pl-6`} />
