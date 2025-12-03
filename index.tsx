@@ -643,11 +643,6 @@ const App = () => {
         cacheBust: true,
         skipFonts: false,
         backgroundColor: '#EDEDED',
-        // iOS Safari 需要特殊处理
-        style: isIOS ? {
-          // 强制使用硬件加速，改善渲染质量
-          transform: 'translateZ(0)',
-        } : undefined,
       });
       
       // 恢复原始样式（iOS 阴影处理）
