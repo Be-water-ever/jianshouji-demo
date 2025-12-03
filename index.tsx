@@ -579,40 +579,7 @@ const App = () => {
     });
   };
 
-  const handleDownload = async () => {
-    if (!previewRef.current) return;
-    
-    // 获取当前活动的滚动容器
-    const getActiveScrollContainer = () => {
-      if (activeTab === 'message') return chatContainerRef.current;
-      if (activeTab === 'forum') return forumContainerRef.current;
-      if (activeTab === 'post') return postContainerRef.current;
-      return null;
-    };
-
-    // 处理滚动位置：临时调整容器位置以匹配当前可见区域
-    const scrollContainer = getActiveScrollContainer();
-    let originalTransform = '';
-    let originalScrollTop = 0;
-    let originalOverflow = '';
-
-    if (scrollContainer) {
-      originalScrollTop = scrollContainer.scrollTop;
-      
-      if (originalScrollTop > 0) {
-        // 保存原始样式
-        originalTransform = scrollContainer.style.transform;
-        originalOverflow = scrollContainer.style.overflow;
-        
-        // 将滚动位置转换为视觉偏移
-        // 1. 重置滚动位置，让库从顶部开始捕获
-        // 2. 使用 transform 向上移动内容，使当前可见区域出现在顶部
-        scrollContainer.scrollTop = 0; // 重置滚动用于捕获
-        scrollContainer.style.transform = `translateY(-${originalScrollTop}px)`;
-        scrollContainer.style.overflow = 'visible'; // 确保内容完全渲染，父容器的 overflow:hidden 会处理裁剪
-      }
-    }
-    
+  const captureElement = async (element: HTMLElement, options: { width?: number; height?: number; style?: any } = {}) => {
     try {
       // 等待字体加载完成
       if (document.fonts && document.fonts.ready) {
@@ -624,7 +591,7 @@ const App = () => {
       
       // iOS Safari 需要特殊处理：临时替换阴影样式
       if (isIOS) {
-        const shadowElements = previewRef.current.querySelectorAll('.shadow-sm');
+        const shadowElements = element.querySelectorAll('.shadow-sm');
         shadowElements.forEach((el) => {
            const htmlEl = el as HTMLElement;
            // 保存原始样式
@@ -638,16 +605,17 @@ const App = () => {
       }
 
       // 使用 toCanvas 方法，对 iOS Safari 的 box-shadow 兼容性更好
-      const canvas = await toCanvas(previewRef.current, {
+      const canvas = await toCanvas(element, {
         pixelRatio: 3,
         cacheBust: true,
         skipFonts: false,
         backgroundColor: '#EDEDED',
+        ...options,
       });
       
       // 恢复原始样式（iOS 阴影处理）
       if (isIOS) {
-        const shadowElements = previewRef.current.querySelectorAll('.shadow-sm');
+        const shadowElements = element.querySelectorAll('.shadow-sm');
         shadowElements.forEach((el) => {
            const htmlEl = el as HTMLElement;
            htmlEl.style.boxShadow = htmlEl.dataset.originalBoxShadow || '';
@@ -658,11 +626,16 @@ const App = () => {
         });
       }
       
-      // 从 canvas 导出为 PNG
-      const dataUrl = canvas.toDataURL('image/png', 1.0);
-      
-      // iOS Safari 需要特殊的下载处理
-      if (isIOS) {
+      return canvas.toDataURL('image/png', 1.0);
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const downloadImage = (dataUrl: string, filename: string) => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    if (isIOS) {
         // 在 iOS 上，创建一个新窗口显示图片，用户可以长按保存
         const newWindow = window.open();
         if (newWindow) {
@@ -691,9 +664,48 @@ const App = () => {
         // PC 端正常下载
       const link = document.createElement("a");
         link.href = dataUrl;
-      link.download = `nova-gen-${activeTab}-${Date.now()}.png`;
+      link.download = filename;
       link.click();
       }
+  };
+
+  const getActiveScrollContainer = () => {
+    if (activeTab === 'message') return chatContainerRef.current;
+    if (activeTab === 'forum') return forumContainerRef.current;
+    if (activeTab === 'post') return postContainerRef.current;
+    return null;
+  };
+
+  const handleDownloadCurrent = async () => {
+    if (!previewRef.current) return;
+    
+    // 处理滚动位置：临时调整容器位置以匹配当前可见区域
+    const scrollContainer = getActiveScrollContainer();
+    let originalTransform = '';
+    let originalScrollTop = 0;
+    let originalOverflow = '';
+
+    if (scrollContainer) {
+      originalScrollTop = scrollContainer.scrollTop;
+      
+      if (originalScrollTop > 0) {
+        // 保存原始样式
+        originalTransform = scrollContainer.style.transform;
+        originalOverflow = scrollContainer.style.overflow;
+        
+        // 将滚动位置转换为视觉偏移
+        scrollContainer.scrollTop = 0; // 重置滚动用于捕获
+        scrollContainer.style.transform = `translateY(-${originalScrollTop}px)`;
+        scrollContainer.style.overflow = 'visible';
+        
+        // 强制重排
+        void scrollContainer.offsetHeight;
+      }
+    }
+    
+    try {
+      const dataUrl = await captureElement(previewRef.current);
+      downloadImage(dataUrl, `nova-gen-${activeTab}-current-${Date.now()}.png`);
     } catch (err) {
       console.error("Screenshot failed", err);
       alert("截图生成失败，请重试");
@@ -703,6 +715,66 @@ const App = () => {
         scrollContainer.style.transform = originalTransform;
         scrollContainer.style.overflow = originalOverflow;
         scrollContainer.scrollTop = originalScrollTop; // 恢复滚动位置
+      }
+    }
+  };
+
+  const handleDownloadFull = async () => {
+    if (!previewRef.current) return;
+    
+    const scrollContainer = getActiveScrollContainer();
+    const phoneScreen = previewRef.current;
+    const phoneCasing = document.getElementById('phone-casing');
+
+    // 保存原始样式
+    const originalScreenHeight = phoneScreen.style.height;
+    const originalScreenOverflow = phoneScreen.style.overflow;
+    const originalCasingHeight = phoneCasing ? phoneCasing.style.height : '';
+    
+    let originalContainerHeight = '';
+    let originalContainerOverflow = '';
+    let originalContainerFlex = '';
+
+    // 临时修改样式以撑开高度
+    // 1. 让 phone-screen 高度自适应
+    phoneScreen.style.height = 'auto';
+    phoneScreen.style.overflow = 'visible';
+    
+    // 2. 同时也让外壳自适应，虽然不截图它，但保持视觉一致性
+    if (phoneCasing) {
+      phoneCasing.style.height = 'auto';
+    }
+
+    if (scrollContainer) {
+      originalContainerHeight = scrollContainer.style.height;
+      originalContainerOverflow = scrollContainer.style.overflow;
+      originalContainerFlex = scrollContainer.style.flex;
+
+      // 3. 让滚动容器高度自适应
+      scrollContainer.style.height = 'auto';
+      scrollContainer.style.overflow = 'visible';
+      scrollContainer.style.flex = 'none'; // 取消 flex: 1 限制
+    }
+
+    try {
+      const dataUrl = await captureElement(previewRef.current);
+      downloadImage(dataUrl, `nova-gen-${activeTab}-full-${Date.now()}.png`);
+    } catch (err) {
+      console.error("Screenshot failed", err);
+      alert("截图生成失败，请重试");
+    } finally {
+      // 恢复原始样式
+      phoneScreen.style.height = originalScreenHeight;
+      phoneScreen.style.overflow = originalScreenOverflow;
+      
+      if (phoneCasing) {
+        phoneCasing.style.height = originalCasingHeight;
+      }
+
+      if (scrollContainer) {
+        scrollContainer.style.height = originalContainerHeight;
+        scrollContainer.style.overflow = originalContainerOverflow;
+        scrollContainer.style.flex = originalContainerFlex;
       }
     }
   };
@@ -1524,9 +1596,18 @@ const App = () => {
 
           </div>
           
-          <div className="p-4 border-t bg-gray-50">
-              <button onClick={handleDownload} className="w-full py-3 bg-gray-900 hover:bg-black text-white font-semibold rounded-lg shadow-md transition flex items-center justify-center gap-2">
-                <Download className="w-4 h-4" /> 生成截图
+          <div className="p-4 border-t bg-gray-50 grid grid-cols-2 gap-3">
+              <button 
+                onClick={handleDownloadCurrent} 
+                className="py-3 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-lg shadow-sm border border-gray-200 transition flex items-center justify-center gap-2"
+              >
+                <Maximize className="w-4 h-4" /> 保存当前视图
+              </button>
+              <button 
+                onClick={handleDownloadFull} 
+                className="py-3 bg-gray-900 hover:bg-black text-white font-semibold rounded-lg shadow-md transition flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4" /> 保存完整长图
               </button>
           </div>
         </div>
