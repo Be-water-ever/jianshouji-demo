@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 
 // --- Constants ---
+const APP_VERSION = "1.1.9"; // 版本号，每次迭代更新
 const inputFieldClass = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition";
 const inputAreaClass = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-h-[80px] resize-none";
 
@@ -696,24 +697,21 @@ const App = () => {
   const handleDownloadCurrent = async () => {
     if (!previewRef.current) return;
     
-    // 处理滚动位置：临时调整容器位置以匹配当前可见区域
     const scrollContainer = getActiveScrollContainer();
-    let originalTransform = '';
     let originalScrollTop = 0;
-    let originalOverflow = '';
+    let originalMarginTop = '';
 
     if (scrollContainer) {
       originalScrollTop = scrollContainer.scrollTop;
       
       if (originalScrollTop > 0) {
         // 保存原始样式
-        originalTransform = scrollContainer.style.transform;
-        originalOverflow = scrollContainer.style.overflow;
+        originalMarginTop = scrollContainer.style.marginTop;
         
-        // 将滚动位置转换为视觉偏移
-        scrollContainer.scrollTop = 0; // 重置滚动用于捕获
-        scrollContainer.style.transform = `translateY(-${originalScrollTop}px)`;
-        scrollContainer.style.overflow = 'visible';
+        // 用 margin-top 模拟滚动位置
+        // 这会影响布局，让底部内容正确填充
+        scrollContainer.scrollTop = 0;
+        scrollContainer.style.marginTop = `-${originalScrollTop}px`;
         
         // 强制重排
         void scrollContainer.offsetHeight;
@@ -721,17 +719,19 @@ const App = () => {
     }
     
     try {
-      const dataUrl = await captureElement(previewRef.current);
+      const dataUrl = await captureElement(previewRef.current, {
+        width: 375,
+        height: 812
+      });
       downloadImage(dataUrl, `nova-gen-${activeTab}-current-${Date.now()}.png`);
     } catch (err) {
       console.error("Screenshot failed", err);
       alert("截图生成失败，请重试");
     } finally {
-      // 确保无论成功还是失败都恢复滚动位置和样式
+      // 恢复原始状态
       if (scrollContainer && originalScrollTop > 0) {
-        scrollContainer.style.transform = originalTransform;
-        scrollContainer.style.overflow = originalOverflow;
-        scrollContainer.scrollTop = originalScrollTop; // 恢复滚动位置
+        scrollContainer.style.marginTop = originalMarginTop;
+        scrollContainer.scrollTop = originalScrollTop;
       }
     }
   };
@@ -801,7 +801,11 @@ const App = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8 flex flex-col items-center justify-center font-sans">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-8 flex flex-col items-center justify-center font-sans relative">
+      {/* 版本号水印 - 右下角 */}
+      <div className="fixed bottom-2 right-2 text-xs text-gray-400 opacity-50 select-none pointer-events-none z-50 font-mono">
+        v{APP_VERSION}
+      </div>
       <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         
         {/* --- Left Panel: Controls --- */}
@@ -1645,7 +1649,13 @@ const App = () => {
             >
               
               {/* Status Bar */}
-              <div className={`h-[44px] flex justify-between items-end px-6 pb-1 z-40 relative ${getStatusBarClass()}`}>
+              <div 
+                className={`flex justify-between items-end px-6 pb-1 z-40 relative flex-shrink-0 ${getStatusBarClass()}`}
+                style={{
+                  height: '44px',
+                  paddingTop: '0px'
+                }}
+              >
                 <span className="font-semibold text-[15px] leading-none ml-2 tracking-wide">{globalConfig.time}</span>
                 <div className="flex items-center gap-[5px]">
                   <Signal className="w-[18px] h-[18px] fill-current" strokeWidth={0} />
@@ -1784,7 +1794,7 @@ const App = () => {
                      })}
                      <Watermark />
                   </div>
-                  <div className="bg-[#F7F7F7] border-t border-[#DCDCDC] p-[10px] px-3 flex items-center gap-3 pb-8">
+                  <div className="bg-[#F7F7F7] border-t border-[#DCDCDC] p-[10px] px-3 flex items-center gap-3 pb-6">
                      <Mic className="w-[28px] h-[28px] text-[#191919]" strokeWidth={1.5} />
                      <div className="flex-1 bg-white rounded-[6px] h-[40px] border border-[#E5E5E5]" />
                      <Smile className="w-[28px] h-[28px] text-[#191919]" strokeWidth={1.5} />
@@ -1850,7 +1860,7 @@ const App = () => {
 
               {/* === MODE: FORUM (BBS/Tieba) === */}
               {activeTab === 'forum' && (
-                <div className="flex flex-col h-full bg-[#F2F2F2]">
+                <div className="flex flex-col flex-1 bg-[#F2F2F2] relative">
                    {/* Forum Header */}
                    <div className="h-[44px] bg-[#F9F9F9] flex items-center px-4 border-b border-gray-300 z-40">
                       <ChevronLeft className="w-6 h-6 text-gray-600 -ml-2" />
@@ -1859,7 +1869,7 @@ const App = () => {
                    </div>
 
                    {/* Forum Content */}
-                   <div ref={forumContainerRef} className="flex-1 overflow-y-auto no-scrollbar">
+                   <div ref={forumContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-[50px]">
                       {/* OP Floor (Floor 1) */}
                       <div className="bg-white p-4 mb-2">
                          <h1 className="text-[19px] font-bold text-[#333] leading-tight mb-3">{forumConfig.title}</h1>
@@ -1932,7 +1942,7 @@ const App = () => {
                    </div>
 
                    {/* Forum Bottom Bar */}
-                   <div className="h-[50px] bg-white border-t flex items-center px-4 gap-3">
+                   <div className="absolute bottom-0 left-0 right-0 h-[50px] bg-white border-t flex items-center px-4 gap-3 z-40">
                       <div className="flex-1 bg-[#F2F2F2] h-[32px] rounded-full flex items-center px-3 text-xs text-gray-400">
                          我来说两句...
                       </div>
@@ -1959,7 +1969,7 @@ const App = () => {
                    </div>
 
                    {/* Content */}
-                   <div ref={postContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-12">
+                   <div ref={postContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-[80px]">
                       {/* Image Carousel Mock */}
                       <div className="w-full aspect-[3/4] bg-gray-100 relative mb-3 overflow-hidden">
                           {postConfig.imageUrl ? (
@@ -2043,7 +2053,7 @@ const App = () => {
                    </div>
 
                    {/* Footer */}
-                   <div className="h-[60px] bg-white border-t flex items-center px-4 gap-4 pb-4">
+                   <div className="absolute bottom-[36px] left-0 right-0 bg-white border-t flex items-center px-4 gap-4 py-3 z-40">
                       <div className="flex-1 bg-gray-100 h-[36px] rounded-full flex items-center px-4 text-sm text-gray-400">
                          说点什么...
                       </div>
